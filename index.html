@@ -130,22 +130,15 @@
     </div>
   </div>
   <script>
-    // Статистика для memory режимов
+    let letterAnswered = false;
+    let mathAnswered = false;
     let memoryStats = {
       memory4: 0,
       memory6: 0,
       memory8: 0
     };
-
-    // ОБЫЧНЫЕ РЕЖИМЫ
-    const lettersRu = [
-      'А','Б','В','Г','Д','Е','Ё','Ж','З','И','Й','К','Л','М','Н','О','П','Р',
-      'С','Т','У','Ф','Х','Ц','Ч','Ш','Щ','Ъ','Ы','Ь','Э','Ю','Я'
-    ];
-    const lettersEn = [
-      'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
-      'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'
-    ];
+    const lettersRu = [ 'А','Б','В','Г','Д','Е','Ё','Ж','З','И','Й','К','Л','М','Н','О','П','Р','С','Т','У','Ф','Х','Ц','Ч','Ш','Щ','Ъ','Ы','Ь','Э','Ю','Я' ];
+    const lettersEn = [ 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z' ];
     const colors = ["#FF5733", "#33FF57", "#3399FF", "#FBD400", "#FF33A1", "#B833FF", "#33FFF6", "#FF9966",
       "#81FF33", "#FFB533", "#33FFB5", "#FF3383", "#33CFFF", "#9D33FF", "#FFC300", "#FF5733",
       "#8DFF33", "#FF3380", "#338CFF", "#A133FF"
@@ -180,8 +173,6 @@
     const checkBtn = document.getElementById('checkBtn');
     const statisticsDiv = document.getElementById('statistics');
     const memoryWrap = document.getElementById('memory-wrap');
-
-    // ======= localStorage =======
     function getSavedStats() {
       const s = localStorage.getItem('mathletters_stats');
       if (s) {
@@ -207,15 +198,9 @@
     }
     function saveStats() { localStorage.setItem('mathletters_stats', JSON.stringify(stats)); }
     function saveMemoryStats() { localStorage.setItem('mathletters_memstats', JSON.stringify(memoryStats)); }
-
-    // ======= Основные функции =======
     const rand = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
-    function getRandomLetterRu() {
-      return lettersRu[Math.floor(Math.random() * lettersRu.length)];
-    }
-    function getRandomLetterEn() {
-      return lettersEn[Math.floor(Math.random() * lettersEn.length)];
-    }
+    function getRandomLetterRu() { return lettersRu[Math.floor(Math.random() * lettersRu.length)]; }
+    function getRandomLetterEn() { return lettersEn[Math.floor(Math.random() * lettersEn.length)]; }
     const getRandomColor = () => colors[Math.floor(Math.random() * colors.length)];
     function updateScore() { scoreDiv.innerText = `Счет: ${stats.balance.toFixed(2)} руб.`; }
     function updateStatsTable() {
@@ -254,10 +239,10 @@
       mathH1.style.color = getRandomColor();
       resultDiv.innerHTML = '';
       answerInput.value = '';
+      mathAnswered = false;
       setTimeout(() => answerInput.focus(), 0);
     }
     let currentLetter = null, a = 0, b = 0, op = '+', answer = 0;
-
     function switchToLettersRu() {
       letterH1.style.display = '';
       mathH1.style.display = 'none';
@@ -272,6 +257,7 @@
       letterH1.style.color = getRandomColor();
       promptP.innerText = 'Нажми эту букву на клавиатуре!';
       resultDiv.innerHTML = '';
+      letterAnswered = false;
       answerInput.blur();
     }
     function switchToLettersEn() {
@@ -288,6 +274,7 @@
       letterH1.style.color = getRandomColor();
       promptP.innerText = 'Press this letter on the keyboard!';
       resultDiv.innerHTML = '';
+      letterAnswered = false;
       answerInput.blur();
     }
     function switchToMath() {
@@ -316,6 +303,7 @@
       startMemoryGame(fieldMode);
     }
     function checkMathAnswer() {
+      if (mathAnswered) return;
       const raw = answerInput.value.trim();
       const num = Number(raw);
       if (!Number.isInteger(num)) {
@@ -326,6 +314,7 @@
       if (num === answer) {
         stats.balance = +(stats.balance + rewards[mode]).toFixed(2);
         stats.math[mode] = (stats.math[mode] || 0) + 1;
+        mathAnswered = true;
         saveStats();
         updateScore();
         updateStatsTable();
@@ -339,6 +328,7 @@
     }
     checkBtn.addEventListener('click', checkMathAnswer);
     answerInput.addEventListener('keydown', (e) => {
+      if (mathAnswered) return e.preventDefault();
       const allowedKeys = ['Backspace','Delete','ArrowLeft','ArrowRight','Tab','Enter'];
       if (allowedKeys.includes(e.key)) {
         if (e.key === 'Enter') { e.preventDefault(); checkMathAnswer(); }
@@ -352,37 +342,40 @@
       e.preventDefault();
     });
     document.addEventListener('keydown', function(e) {
-      if (modeSel.value === 'lettersRu') {
+      if (modeSel.value === 'lettersRu' || modeSel.value === 'lettersEn') {
+        if (letterAnswered) return;
         let pressed = e.key.toUpperCase();
         let target = letterH1.innerText;
-        if (pressed === target) {
-          stats.balance = +(stats.balance + rewards.lettersRu).toFixed(2);
-          stats.lettersFoundRu += 1;
-          saveStats();
-          updateScore();
-          updateStatsTable();
-          resultDiv.innerHTML = `Молодец! <span style="color:#3399FF;">+${rewards.lettersRu} руб.</span> ✨😍👍`;
-          resultDiv.style.color = "#33FF57";
-          setTimeout(nextItem, 800);
-        } else if (lettersRu.includes(pressed)) {
-          resultDiv.innerHTML = `Ой! Это не "${target}".`;
-          resultDiv.style.color = "#FF5733";
-        }
-      } else if (modeSel.value === 'lettersEn') {
-        let pressed = e.key.toUpperCase();
-        let target = letterH1.innerText;
-        if (pressed === target) {
-          stats.balance = +(stats.balance + rewards.lettersEn).toFixed(2);
-          stats.lettersFoundEn += 1;
-          saveStats();
-          updateScore();
-          updateStatsTable();
-          resultDiv.innerHTML = `Good job! <span style="color:#3399FF;">+${rewards.lettersEn} руб.</span> ✨😍👍`;
-          resultDiv.style.color = "#33FF57";
-          setTimeout(nextItem, 800);
-        } else if (lettersEn.includes(pressed)) {
-          resultDiv.innerHTML = `Oops! It's not "${target}".`;
-          resultDiv.style.color = "#FF5733";
+        if (modeSel.value === 'lettersRu') {
+          if (pressed === target) {
+            stats.balance = +(stats.balance + rewards.lettersRu).toFixed(2);
+            stats.lettersFoundRu += 1;
+            letterAnswered = true;
+            saveStats();
+            updateScore();
+            updateStatsTable();
+            resultDiv.innerHTML = `Молодец! <span style="color:#3399FF;">+${rewards.lettersRu} руб.</span> ✨😍👍`;
+            resultDiv.style.color = "#33FF57";
+            setTimeout(nextItem, 800);
+          } else if (lettersRu.includes(pressed)) {
+            resultDiv.innerHTML = `Ой! Это не "${target}".`;
+            resultDiv.style.color = "#FF5733";
+          }
+        } else {
+          if (pressed === target) {
+            stats.balance = +(stats.balance + rewards.lettersEn).toFixed(2);
+            stats.lettersFoundEn += 1;
+            letterAnswered = true;
+            saveStats();
+            updateScore();
+            updateStatsTable();
+            resultDiv.innerHTML = `Good job! <span style="color:#3399FF;">+${rewards.lettersEn} руб.</span> ✨😍👍`;
+            resultDiv.style.color = "#33FF57";
+            setTimeout(nextItem, 800);
+          } else if (lettersEn.includes(pressed)) {
+            resultDiv.innerHTML = `Oops! It's not "${target}".`;
+            resultDiv.style.color = "#FF5733";
+          }
         }
       }
     });
@@ -391,10 +384,12 @@
         letterH1.innerText = getRandomLetterRu();
         letterH1.style.color = getRandomColor();
         resultDiv.innerHTML = "";
+        letterAnswered = false;
       } else if (mode === 'lettersEn') {
         letterH1.innerText = getRandomLetterEn();
         letterH1.style.color = getRandomColor();
         resultDiv.innerHTML = "";
+        letterAnswered = false;
       } else {
         generateMathTask();
       }
@@ -413,7 +408,7 @@
       }
     });
 
-    // ====== НАЙДИ ПАРУ РЕЖИМЫ ======
+    // Найди пару + вся остальная логика ниже без изменений!
     let board = [], opened = [], matchedCount = 0, locked = false, currentMemoryMode = "memory4";
     const boardDiv = document.getElementById('game-board');
     const memoryInfoDiv = document.getElementById('memory-info');
@@ -501,14 +496,11 @@
       restartBtn.style.display = 'none';
     }
     restartBtn.onclick = function() { startMemoryGame(currentMemoryMode); };
-
-    // === ИНИЦИАЛИЗАЦИЯ ===
     stats = getSavedStats();
     memoryStats = getSavedMemoryStats();
     updateScore();
     updateStatsTable();
     switchToLettersRu();
-
     modeSel.addEventListener('change', () => {
       mode = modeSel.value;
       if(mode==="lettersRu")      { switchToLettersRu(); }
@@ -516,7 +508,6 @@
       else if(mode==="math10"||mode==="math20"||mode==="math30") { switchToMath(); }
       else                       { switchToMemory(mode); }
     });
-
     memoryWrap.style.display = 'none';
   </script>
 </body>
