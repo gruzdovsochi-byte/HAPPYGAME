@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <title>Учимся и развиваемся!</title>
+  <title>Игры на развитие</title>
   <style>
     body { background: #fffcd6; font-family: 'Comic Sans MS', Arial, Helvetica, sans-serif; margin:0; padding:0;}
     #game { text-align: center; margin-top: 40px; }
@@ -87,10 +87,35 @@
       display: inline-block;
     }
     #restart-btn:hover { background: #33fff0; color: #333; }
-    @media (max-width:650px) {
-      #game-board {grid-template-columns: repeat(4, 12vw);}
-      .cell{width:10vw; height:10vw; font-size:4vw;}
+    /* Слова */
+    #word-wrap {display:none; margin-top:24px;}
+    #wordBox {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      margin-bottom: 14px;
     }
+    .word-letter {
+      font-size: 52px;
+      border-bottom: 2px dashed #aaa;
+      min-width: 44px;
+      padding: 0 6px;
+      transition: background 0.2s, color 0.2s;
+      background: #fff7ef;
+      color: #87758e;
+      border-radius: 8px;
+      box-shadow: 1px 2px 5px #ede9fa;
+      font-weight: bold;
+    }
+    .word-letter.done {
+      background: #8fefa5;
+      color: #345b37;
+      border-bottom: 2px solid #56c578;
+    }
+    #timerBox { font-size: 36px; color:#b1422d; margin-bottom:8px;}
+    #wordResult { font-size:34px; min-height:40px; margin-bottom:14px;}
+    #nextWordBtn { background: #81d36b; font-size: 26px; border-radius:16px; padding:12px 26px; }
+    #nextWordBtn:hover { background: #5acb85; color:#222; }
   </style>
 </head>
 <body>
@@ -106,6 +131,12 @@
         <option value="memory4">Найди пару 4×4</option>
         <option value="memory6">Найди пару 6×6</option>
         <option value="memory8">Найди пару 8×8</option>
+        <option value="word6ru">Русские слова (6 букв)</option>
+        <option value="word7ru">Русские слова (7 букв)</option>
+        <option value="word8ru">Русские слова (8 букв)</option>
+        <option value="word6en">Английские слова (6 букв)</option>
+        <option value="word7en">Английские слова (7 букв)</option>
+        <option value="word8en">Английские слова (8 букв)</option>
       </select>
     </div>
     <div id="score">Счет: 0.00 руб.</div>
@@ -128,387 +159,191 @@
       <div id="game-board"></div>
       <button id="restart-btn">Начать заново</button>
     </div>
+    <!-- Слова -->
+    <div id="word-wrap" style="display:none;">
+      <div id="timerBox"></div>
+      <div id="wordBox"></div>
+      <div id="wordResult"></div>
+      <button id="nextWordBtn" style="display:none;">Следующее слово</button>
+    </div>
   </div>
   <script>
-    let letterAnswered = false;
-    let mathAnswered = false;
-    let memoryStats = {
-      memory4: 0,
-      memory6: 0,
-      memory8: 0
-    };
+    // == Дополненные словари ==
+    const wordListRu6=["ПОЕЗДЫ","ТАБЛОК","СОСНЫЙ","КАРТИН","АРБУЗЫ","СТОЛИК","МАЛИНА","ВЕРХОМ","СЕРДЦЕ","ГРУППА","СТОЛИК","ЛИМОНЫ","КОШЕЛЬ"];
+    const wordListRu7=["КАРАМЕЛ","САПОГИЧ","ВЕНТИЛЬ","ЛАМПОЧК","КОРОВАМ","ПИРАТЫ","МОРКОВК","ЖУРНАЛЫ","ОКЕАНЫ","ПИОНЕРЫ","ШКОЛЬНИ"];
+    const wordListRu8=["ПЕРЕЛЕТЫ","СЕКРЕТЫИ","РАДИАТОР","ЛАМИНАТЫ","ПРОВОДКА","МАГАЗИНЫ","ФЕВРАЛЬ","КАНИСТРА","КУЛЬТУРА","КВАДРАТЫ"];
+    const wordListEn6=["MONKEY","TABLET","SAFETY","WINDOW","FORMAL","SUBWAY","POCKET","BUTTON","BALLET","SILENT","BOTTLE"];
+    const wordListEn7=["CAPTAIN","MONSTER","STATION","SUBJECT","SECTION","PROJECT","PRESENT","FIREMAN","BISCUIT","VIOLETS","STUDENT"];
+    const wordListEn8=["OPERATOR","SOLUTION","ELEVATOR","ACTIVATE","CONTRACT","DIALOGUE","BASEMENT","MEDICINE","JOURNALY","SUNSHINE"];
+    // == Остальное как раньше ==
     const lettersRu = [ 'А','Б','В','Г','Д','Е','Ё','Ж','З','И','Й','К','Л','М','Н','О','П','Р','С','Т','У','Ф','Х','Ц','Ч','Ш','Щ','Ъ','Ы','Ь','Э','Ю','Я' ];
     const lettersEn = [ 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z' ];
-    const colors = ["#FF5733", "#33FF57", "#3399FF", "#FBD400", "#FF33A1", "#B833FF", "#33FFF6", "#FF9966",
-      "#81FF33", "#FFB533", "#33FFB5", "#FF3383", "#33CFFF", "#9D33FF", "#FFC300", "#FF5733",
-      "#8DFF33", "#FF3380", "#338CFF", "#A133FF"
-    ];
     const rewards = {
-      lettersRu: 0.25,
-      lettersEn: 0.30,
-      math10: 0.5,
-      math20: 0.75,
-      math30: 1.0,
-      memory4: 0.5,
-      memory6: 0.75,
-      memory8: 1.0
+      lettersRu: 0.25, lettersEn: 0.30, math10: 0.5, math20: 0.75, math30: 1.0,
+      memory4: 0.5, memory6: 0.75, memory8: 1.0,
+      word6ru: 2.0, word7ru: 2.0, word8ru: 2.0,
+      word6en: 2.0, word7en: 2.0, word8en: 2.0
     };
-    let stats = {
-      balance: 0,
-      lettersFoundRu: 0,
-      lettersFoundEn: 0,
-      math: { math10: 0, math20: 0, math30: 0 }
-    };
-    let mode = 'lettersRu';
-    const modeSel = document.getElementById('mode');
-    const scoreDiv = document.getElementById('score');
-    const letterH1 = document.getElementById('letter');
-    const mathH1 = document.getElementById('math');
-    const promptP = document.getElementById('prompt');
-    const resultDiv = document.getElementById('result');
-    const nextBtn = document.getElementById('nextBtn');
-    const outputBtn = document.getElementById('outputBtn');
-    const answerWrap = document.getElementById('answerWrap');
-    const answerInput = document.getElementById('answerInput');
-    const checkBtn = document.getElementById('checkBtn');
-    const statisticsDiv = document.getElementById('statistics');
-    const memoryWrap = document.getElementById('memory-wrap');
-    function getSavedStats() {
-      const s = localStorage.getItem('mathletters_stats');
-      if (s) {
-        try {
-          const parsed = JSON.parse(s);
-          if (parsed && typeof parsed === "object") return {
-            ...stats, ...parsed,
-            math: { ...stats.math, ...parsed.math }
-          };
-        } catch {}
-      }
-      return stats;
-    }
-    function getSavedMemoryStats() {
-      const s = localStorage.getItem('mathletters_memstats');
-      if (s) {
-        try {
-          let obj = JSON.parse(s);
-          if (obj.memory4 >= 0 && obj.memory6 >= 0 && obj.memory8 >= 0) return obj;
-        } catch{}
-      }
-      return memoryStats;
-    }
-    function saveStats() { localStorage.setItem('mathletters_stats', JSON.stringify(stats)); }
-    function saveMemoryStats() { localStorage.setItem('mathletters_memstats', JSON.stringify(memoryStats)); }
-    const rand = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
-    function getRandomLetterRu() { return lettersRu[Math.floor(Math.random() * lettersRu.length)]; }
-    function getRandomLetterEn() { return lettersEn[Math.floor(Math.random() * lettersEn.length)]; }
-    const getRandomColor = () => colors[Math.floor(Math.random() * colors.length)];
-    function updateScore() { scoreDiv.innerText = `Счет: ${stats.balance.toFixed(2)} руб.`; }
-    function updateStatsTable() {
+    let stats = { balance: 0, lettersFoundRu: 0, lettersFoundEn: 0, math: { math10: 0, math20: 0, math30: 0 } };
+    let memoryStats = { memory4: 0, memory6: 0, memory8: 0 };
+    let wordStats = { word6ru: 0, word7ru: 0, word8ru: 0, word6en: 0, word7en: 0, word8en: 0 };
+    let letterAnswered = false, mathAnswered = false, mode = "lettersRu";
+    let currentWord="", wordLetters=[], currIdx=0, wordTimer=null, timeLeft=0, wordAnswered=false, prevWord="";
+    const modeSel = document.getElementById('mode'), scoreDiv = document.getElementById('score'), letterH1 = document.getElementById('letter'), mathH1 = document.getElementById('math'), promptP = document.getElementById('prompt'), resultDiv = document.getElementById('result'), nextBtn = document.getElementById('nextBtn'), outputBtn = document.getElementById('outputBtn'), answerWrap = document.getElementById('answerWrap'), answerInput = document.getElementById('answerInput'), checkBtn = document.getElementById('checkBtn'), statisticsDiv = document.getElementById('statistics'), memoryWrap = document.getElementById('memory-wrap'), wordWrap = document.getElementById('word-wrap'), wordBox = document.getElementById('wordBox'), wordResult = document.getElementById('wordResult'), nextWordBtn = document.getElementById('nextWordBtn'), timerBox = document.getElementById('timerBox');
+    const rand = (min,max) => Math.floor(Math.random()*(max-min+1))+min;
+    function updateScore(){scoreDiv.innerText=`Счет: ${stats.balance.toFixed(2)} руб.`;}
+    function updateStatsTable(){
       statisticsDiv.innerHTML = `<h3>Статистика</h3>
-        <table>
-          <tr><td>Русских букв найдено:</td><td><b>${stats.lettersFoundRu}</b></td></tr>
-          <tr><td>Английских букв найдено:</td><td><b>${stats.lettersFoundEn}</b></td></tr>
-          <tr><th colspan="2" style="padding:8px 0 4px 0; color:#8B5CD0;">Математика</th></tr>
-          <tr><td>Правильных ответов (0–10):</td><td><b>${stats.math.math10}</b></td></tr>
-          <tr><td>Правильных ответов (11–20):</td><td><b>${stats.math.math20}</b></td></tr>
-          <tr><td>Правильных ответов (21–30):</td><td><b>${stats.math.math30}</b></td></tr>
-          <tr><th colspan="2" style="padding:8px 0 4px 0; color:#b567bb;">Найди пару</th></tr>
-          <tr><td>Пары (4×4):</td><td><b>${memoryStats.memory4}</b></td></tr>
-          <tr><td>Пары (6×6):</td><td><b>${memoryStats.memory6}</b></td></tr>
-          <tr><td>Пары (8×8):</td><td><b>${memoryStats.memory8}</b></td></tr>
-        </table>
-        <div style="margin-top:10px;color:#CB6632;">Всего заработано: <b>${stats.balance.toFixed(2)}</b> руб.</div>`;
+      <table>
+        <tr><td>Русских букв найдено:</td><td><b>${stats.lettersFoundRu}</b></td></tr>
+        <tr><td>Английских букв найдено:</td><td><b>${stats.lettersFoundEn}</b></td></tr>
+        <tr><th colspan="2" style="padding:8px 0 4px 0; color:#8B5CD0;">Математика</th></tr>
+        <tr><td>Правильных ответов (0–10):</td><td><b>${stats.math.math10}</b></td></tr>
+        <tr><td>Правильных ответов (11–20):</td><td><b>${stats.math.math20}</b></td></tr>
+        <tr><td>Правильных ответов (21–30):</td><td><b>${stats.math.math30}</b></td></tr>
+        <tr><th colspan="2" style="padding:8px 0 4px 0; color:#b567bb;">Найди пару</th></tr>
+        <tr><td>Пары (4×4):</td><td><b>${memoryStats.memory4}</b></td></tr>
+        <tr><td>Пары (6×6):</td><td><b>${memoryStats.memory6}</b></td></tr>
+        <tr><td>Пары (8×8):</td><td><b>${memoryStats.memory8}</b></td></tr>
+        <tr><th colspan="2" style="padding:8px 0 4px 0; color:#4e8cbb;">Русские слова</th></tr>
+        <tr><td>Слов (6 букв):</td><td><b>${wordStats.word6ru}</b></td></tr>
+        <tr><td>Слов (7 букв):</td><td><b>${wordStats.word7ru}</b></td></tr>
+        <tr><td>Слов (8 букв):</td><td><b>${wordStats.word8ru}</b></td></tr>
+        <tr><th colspan="2" style="padding:8px 0 4px 0; color:#2278bb;">Английские слова</th></tr>
+        <tr><td>Words (6 letters):</td><td><b>${wordStats.word6en}</b></td></tr>
+        <tr><td>Words (7 letters):</td><td><b>${wordStats.word7en}</b></td></tr>
+        <tr><td>Words (8 letters):</td><td><b>${wordStats.word8en}</b></td></tr>
+      </table>
+      <div style="margin-top:10px;color:#CB6632;">Всего заработано: <b>${stats.balance.toFixed(2)}</b> руб.</div>`;
     }
-    function generateMathTask() {
-      let min, max;
-      if (mode === "math10") { min = 0;  max = 10; }
-      if (mode === "math20") { min = 11; max = 20; }
-      if (mode === "math30") { min = 21; max = 30; }
-      op = Math.random() < 0.5 ? '+' : '-';
-      if (op === '+') {
-        let sum = rand(min, max);
-        let a_tmp = rand(min, sum);
-        let b_tmp = sum - a_tmp;
-        a = a_tmp; b = b_tmp; answer = sum;
-      } else {
-        a = rand(min, max);
-        b = rand(min, a);
-        answer = a - b;
-      }
-      mathH1.innerText = `${a} ${op === '+' ? '+' : '−'} ${b} = ?`;
-      mathH1.style.color = getRandomColor();
-      resultDiv.innerHTML = '';
-      answerInput.value = '';
-      mathAnswered = false;
-      setTimeout(() => answerInput.focus(), 0);
-    }
-    let currentLetter = null, a = 0, b = 0, op = '+', answer = 0;
-    function switchToLettersRu() {
-      letterH1.style.display = '';
-      mathH1.style.display = 'none';
-      answerWrap.style.display = 'none';
-      promptP.style.display = '';
-      resultDiv.style.display = '';
-      nextBtn.style.display = '';
-      outputBtn.style.display = '';
-      statisticsDiv.style.display = '';
-      memoryWrap.style.display = 'none';
-      letterH1.innerText = getRandomLetterRu();
-      letterH1.style.color = getRandomColor();
+    function saveStats(){localStorage.setItem('mathletters_stats',JSON.stringify(stats));}
+    function saveMemoryStats(){localStorage.setItem('mathletters_memstats',JSON.stringify(memoryStats));}
+    function saveWordStats(){localStorage.setItem('mathletters_wordstats',JSON.stringify(wordStats));}
+    function loadAllStats(){try{let s=localStorage.getItem('mathletters_stats');if(s){let o=JSON.parse(s);Object.assign(stats,o);}
+      s=localStorage.getItem('mathletters_memstats');if(s){let o=JSON.parse(s);Object.assign(memoryStats,o);}
+      s=localStorage.getItem('mathletters_wordstats');if(s){let o=JSON.parse(s);Object.assign(wordStats,o);}}catch{}}
+    function showBlocks(arr){arr.forEach(id=>{const e=document.getElementById(id);if(e)e.style.display='';});}
+    function hideBlocks(arr){arr.forEach(id=>{const e=document.getElementById(id);if(e)e.style.display='none';});}
+    function switchToLettersRu(){
+      showBlocks(["letter","score","topbar","prompt","result","controls","statistics"]);
+      hideBlocks(["math","answerWrap","memory-wrap","word-wrap"]);
+      letterH1.innerText = lettersRu[rand(0,lettersRu.length-1)];
+      letterH1.style.color = "#3399ff";
       promptP.innerText = 'Нажми эту букву на клавиатуре!';
-      resultDiv.innerHTML = '';
-      letterAnswered = false;
-      answerInput.blur();
+      resultDiv.innerHTML = ''; letterAnswered = false;
     }
-    function switchToLettersEn() {
-      letterH1.style.display = '';
-      mathH1.style.display = 'none';
-      answerWrap.style.display = 'none';
-      promptP.style.display = '';
-      resultDiv.style.display = '';
-      nextBtn.style.display = '';
-      outputBtn.style.display = '';
-      statisticsDiv.style.display = '';
-      memoryWrap.style.display = 'none';
-      letterH1.innerText = getRandomLetterEn();
-      letterH1.style.color = getRandomColor();
+    function switchToLettersEn(){
+      showBlocks(["letter","score","topbar","prompt","result","controls","statistics"]);
+      hideBlocks(["math","answerWrap","memory-wrap","word-wrap"]);
+      letterH1.innerText = lettersEn[rand(0,lettersEn.length-1)];
+      letterH1.style.color = "#3399ff";
       promptP.innerText = 'Press this letter on the keyboard!';
-      resultDiv.innerHTML = '';
-      letterAnswered = false;
-      answerInput.blur();
+      resultDiv.innerHTML = ''; letterAnswered = false;
     }
-    function switchToMath() {
-      letterH1.style.display = 'none';
-      mathH1.style.display = '';
-      answerWrap.style.display = 'flex';
-      promptP.style.display = '';
-      resultDiv.style.display = '';
-      nextBtn.style.display = '';
-      outputBtn.style.display = '';
-      statisticsDiv.style.display = '';
-      memoryWrap.style.display = 'none';
-      promptP.innerText = 'Реши пример и введи ответ:';
+    function switchToMath(){
+      showBlocks(["math","score","topbar","prompt","result","controls","statistics","answerWrap"]);
+      hideBlocks(["letter","memory-wrap","word-wrap"]);
       generateMathTask();
     }
-    function switchToMemory(fieldMode) {
-      letterH1.style.display = 'none';
-      mathH1.style.display = 'none';
-      answerWrap.style.display = 'none';
-      promptP.style.display = 'none';
-      resultDiv.style.display = 'none';
-      nextBtn.style.display = 'none';
-      outputBtn.style.display = 'none';
-      statisticsDiv.style.display = 'none';
-      memoryWrap.style.display = 'block';
-      startMemoryGame(fieldMode);
+    function switchToMemory(mMode){
+      hideBlocks(["letter","math","answerWrap","prompt","result","controls","word-wrap","statistics"]);
+      document.getElementById('memory-wrap').style.display='block';
+      startMemoryGame(mMode);
     }
-    function checkMathAnswer() {
-      if (mathAnswered) return;
-      const raw = answerInput.value.trim();
-      const num = Number(raw);
-      if (!Number.isInteger(num)) {
-        resultDiv.innerHTML = `Введи целое число!`;
-        resultDiv.style.color = "#FF5733";
-        return;
-      }
-      if (num === answer) {
-        stats.balance = +(stats.balance + rewards[mode]).toFixed(2);
-        stats.math[mode] = (stats.math[mode] || 0) + 1;
-        mathAnswered = true;
-        saveStats();
-        updateScore();
-        updateStatsTable();
-        resultDiv.innerHTML = `Молодец! <span style="color:#3399FF;">+${rewards[mode]} руб.</span> ✨😍👍`;
-        resultDiv.style.color = "#33FF57";
-        setTimeout(() => { generateMathTask(); }, 700);
-      } else {
-        resultDiv.innerHTML = `Ой! Правильный ответ не ${num}. Попробуй ещё!`;
-        resultDiv.style.color = "#FF5733";
-      }
+    function switchToWord(modeKey){
+      hideBlocks(["letter","math","answerWrap","prompt","result","controls","statistics","memory-wrap"]);
+      wordWrap.style.display='block';
+      startWordGame(modeKey);
     }
-    checkBtn.addEventListener('click', checkMathAnswer);
-    answerInput.addEventListener('keydown', (e) => {
-      if (mathAnswered) return e.preventDefault();
-      const allowedKeys = ['Backspace','Delete','ArrowLeft','ArrowRight','Tab','Enter'];
-      if (allowedKeys.includes(e.key)) {
-        if (e.key === 'Enter') { e.preventDefault(); checkMathAnswer(); }
-        return;
-      }
-      if (e.key >= '0' && e.key <= '9') {
-        const sel = answerInput.selectionStart !== answerInput.selectionEnd;
-        if (answerInput.value.length >= 2 && !sel) e.preventDefault();
-        return;
-      }
-      e.preventDefault();
-    });
-    document.addEventListener('keydown', function(e) {
-      if (modeSel.value === 'lettersRu' || modeSel.value === 'lettersEn') {
-        if (letterAnswered) return;
-        let pressed = e.key.toUpperCase();
-        let target = letterH1.innerText;
-        if (modeSel.value === 'lettersRu') {
-          if (pressed === target) {
-            stats.balance = +(stats.balance + rewards.lettersRu).toFixed(2);
-            stats.lettersFoundRu += 1;
-            letterAnswered = true;
-            saveStats();
-            updateScore();
-            updateStatsTable();
-            resultDiv.innerHTML = `Молодец! <span style="color:#3399FF;">+${rewards.lettersRu} руб.</span> ✨😍👍`;
-            resultDiv.style.color = "#33FF57";
-            setTimeout(nextItem, 800);
-          } else if (lettersRu.includes(pressed)) {
-            resultDiv.innerHTML = `Ой! Это не "${target}".`;
-            resultDiv.style.color = "#FF5733";
-          }
-        } else {
-          if (pressed === target) {
-            stats.balance = +(stats.balance + rewards.lettersEn).toFixed(2);
-            stats.lettersFoundEn += 1;
-            letterAnswered = true;
-            saveStats();
-            updateScore();
-            updateStatsTable();
-            resultDiv.innerHTML = `Good job! <span style="color:#3399FF;">+${rewards.lettersEn} руб.</span> ✨😍👍`;
-            resultDiv.style.color = "#33FF57";
-            setTimeout(nextItem, 800);
-          } else if (lettersEn.includes(pressed)) {
-            resultDiv.innerHTML = `Oops! It's not "${target}".`;
-            resultDiv.style.color = "#FF5733";
-          }
-        }
-      }
-    });
-    function nextItem() {
-      if (mode === 'lettersRu') {
-        letterH1.innerText = getRandomLetterRu();
-        letterH1.style.color = getRandomColor();
-        resultDiv.innerHTML = "";
-        letterAnswered = false;
-      } else if (mode === 'lettersEn') {
-        letterH1.innerText = getRandomLetterEn();
-        letterH1.style.color = getRandomColor();
-        resultDiv.innerHTML = "";
-        letterAnswered = false;
-      } else {
-        generateMathTask();
-      }
+    function generateMathTask(){let min,max;
+      if(mode==="math10"){min=0;max=10;}
+      if(mode==="math20"){min=11;max=20;}
+      if(mode==="math30"){min=21;max=30;}
+      op=Math.random()<0.5?'+':'-';
+      if(op==='+'){let sum=rand(min,max);let a1=rand(min,sum);let b1=sum-a1;a=a1;b=b1;answer=sum;}
+      else{a=rand(min,max);b=rand(min,a);answer=a-b;}
+      mathH1.innerText=`${a} ${op==='+'?'+':'−'} ${b} = ?`;
+      resultDiv.innerHTML=''; answerInput.value=''; mathAnswered=false; setTimeout(()=>answerInput.focus(),0);
     }
-    nextBtn.addEventListener('click', nextItem);
-    outputBtn.addEventListener('click', () => {
-      if (stats.balance > 0) {
-        let oldBalance = stats.balance.toFixed(2);
-        stats.balance = 0;
-        saveStats();
-        updateScore();
-        updateStatsTable();
-        alert(`Поздравляем!\n\nТы вывел ${oldBalance} руб.\nТеперь можешь потратить их как захочешь!`);
-      } else {
-        alert('Пока нечего выводить!\nЗаработай еще 😉');
-      }
-    });
-
-    // Найди пару + вся остальная логика ниже без изменений!
-    let board = [], opened = [], matchedCount = 0, locked = false, currentMemoryMode = "memory4";
-    const boardDiv = document.getElementById('game-board');
-    const memoryInfoDiv = document.getElementById('memory-info');
-    const restartBtn = document.getElementById('restart-btn');
-    function getBoardConf(mMode) {
-      if (mMode==="memory4") return {size:4, pairs:8};
-      if (mMode==="memory6") return {size:6, pairs:18};
-      return {size:8, pairs:32};
+    checkBtn.onclick=checkMathAnswer;
+    function checkMathAnswer(){if(mathAnswered)return;
+      let raw=answerInput.value.trim(),num=Number(raw);
+      if(!Number.isInteger(num)){resultDiv.innerHTML='Введи целое число!';resultDiv.style.color="#FF5733";return;}
+      if(num===answer){stats.balance=+(stats.balance+rewards[mode]).toFixed(2);stats.math[mode]=(stats.math[mode]||0)+1;mathAnswered=true;saveStats();updateScore();updateStatsTable();resultDiv.innerHTML=`Молодец! <span style="color:#3399FF;">+${rewards[mode]} руб.</span> ✨😍👍`;resultDiv.style.color="#33FF57";setTimeout(()=>generateMathTask(),700);}
+      else{resultDiv.innerHTML=`Ой! Правильный ответ не ${num}. Попробуй ещё!`;resultDiv.style.color="#FF5733";}
     }
-    function shuffle(array) {
-      for (let i = array.length - 1; i > 0; i--) {
-        let j = Math.floor(Math.random() * (i + 1));
-        [array[i], array[j]] = [array[j], array[i]];
-      }
-      return array;
+    answerInput.onkeydown=function(e){if(mathAnswered)return e.preventDefault();const allowed=['Backspace','Delete','ArrowLeft','ArrowRight','Tab','Enter'];
+      if(allowed.includes(e.key)){if(e.key==='Enter'){e.preventDefault();checkMathAnswer();}return;}if(e.key>='0'&&e.key<='9'){if(answerInput.value.length>=2)return e.preventDefault();}e.preventDefault();};
+    document.onkeydown=function(e){if(modeSel.value==="lettersRu"||modeSel.value==="lettersEn"){if(letterAnswered)return;
+      let pressed=e.key.toUpperCase(),target=letterH1.innerText;
+      if(modeSel.value==="lettersRu"){if(pressed===target){stats.balance=+(stats.balance+rewards.lettersRu).toFixed(2);stats.lettersFoundRu++;letterAnswered=true;saveStats();updateScore();updateStatsTable();resultDiv.innerHTML=`Молодец! <span style="color:#3399FF;">+${rewards.lettersRu} руб.</span> ✨😍👍`;resultDiv.style.color="#33FF57";setTimeout(nextItem,800);}
+      else if(lettersRu.includes(pressed)){resultDiv.innerHTML=`Ой! Это не "${target}".`;resultDiv.style.color="#FF5733";}}
+      else{if(pressed===target){stats.balance=+(stats.balance+rewards.lettersEn).toFixed(2);stats.lettersFoundEn++;letterAnswered=true;saveStats();updateScore();updateStatsTable();resultDiv.innerHTML=`Good job! <span style="color:#3399FF;">+${rewards.lettersEn} руб.</span> ✨😍👍`;resultDiv.style.color="#33FF57";setTimeout(nextItem,800);}
+      else if(lettersEn.includes(pressed)){resultDiv.innerHTML=`Oops! It's not "${target}".`;resultDiv.style.color="#FF5733";}}}
+      else if(modeSel.value.startsWith('word')){if(wordAnswered||currIdx>=wordLetters.length)return;let pressed=e.key.toUpperCase(),letter=wordLetters[currIdx];if(/[А-ЯЁ]/.test(letter)&&pressed===letter){wordBox.children[currIdx].classList.add('done');currIdx++;if(currIdx>=wordLetters.length)winWord();}
+      else if(/[A-Z]/.test(letter)&&pressed===letter){wordBox.children[currIdx].classList.add('done');currIdx++;if(currIdx>=wordLetters.length)winWord();}}
+    };
+    function nextItem(){if(mode==="lettersRu"){switchToLettersRu();}
+      else if(mode==="lettersEn"){switchToLettersEn();}
+      else{generateMathTask();}}
+    nextBtn.onclick=nextItem;
+    outputBtn.onclick=function(){
+      if(stats.balance>0){let oldB=stats.balance.toFixed(2);stats.balance=0;saveStats();updateScore();updateStatsTable();alert(`Поздравляем!\n\nТы вывел ${oldB} руб.\nТеперь можешь потратить их как захочешь!`);}
+      else alert('Пока нечего выводить!\nЗаработай еще 😉');
+    };
+    // ====== Найди пару ======
+    let board=[],opened=[],matchedCount=0,locked=false,currentMemoryMode="memory4";
+    const boardDiv=document.getElementById('game-board'),memoryInfoDiv=document.getElementById('memory-info'),restartBtn=document.getElementById('restart-btn');
+    function getBoardConf(mMode){if(mMode==="memory4")return{size:4,pairs:8};if(mMode==="memory6")return{size:6,pairs:18};return{size:8,pairs:32};}
+    function shuffle(array){for(let i=array.length-1;i>0;i--){let j=Math.floor(Math.random()*(i+1));[array[i],array[j]]=[array[j],array[i]];}return array;}
+    function newBoard(mMode){let conf=getBoardConf(mMode);board=[];opened=[];matchedCount=0;locked=false;let nums=[];for(let n=1;n<=conf.pairs;n++){nums.push(n);nums.push(n);}shuffle(nums);for(let i=0;i<conf.size*conf.size;i++){board.push({num:nums[i],open:false,matched:false});}}
+    function renderBoard(mMode){let conf=getBoardConf(mMode);boardDiv.innerHTML='';boardDiv.style.gridTemplateColumns=`repeat(${conf.size},48px)`;boardDiv.style.gridTemplateRows=`repeat(${conf.size},48px)`;board.forEach((cell,idx)=>{let div=document.createElement('div');div.className='cell';div.style.width="46px";div.style.height="46px";if(cell.open)div.classList.add('open');if(cell.matched)div.classList.add('matched');div.textContent=cell.open||cell.matched?cell.num:'';div.onclick=()=>cellClicked(idx,mMode);boardDiv.appendChild(div);});}
+    function cellClicked(idx,mMode){if(locked||board[idx].matched||board[idx].open||opened.length>=2)return;board[idx].open=true;opened.push(idx);renderBoard(mMode);if(opened.length===2){locked=true;let a=board[opened[0]].num,b=board[opened[1]].num;if(a===b){setTimeout(()=>{board[opened[0]].matched=true;board[opened[1]].matched=true;matchedCount++;stats.balance=+(stats.balance+rewards[mMode]).toFixed(2);memoryStats[mMode]+=1;saveStats();saveMemoryStats();updateScore();updateStatsTable();opened=[];locked=false;renderBoard(mMode);let conf=getBoardConf(mMode);if(matchedCount===conf.pairs){memoryInfoDiv.textContent="Поздравляем! Все пары найдены 🎉";restartBtn.style.display='';}},500);}else{setTimeout(()=>{board[opened[0]].open=false;board[opened[1]].open=false;opened=[];locked=false;renderBoard(mMode);},800);}}}
+    function startMemoryGame(mMode){currentMemoryMode=mMode;newBoard(mMode);renderBoard(mMode);memoryInfoDiv.textContent="Откройте два квадрата с одинаковым числом!";restartBtn.style.display='none';}
+    restartBtn.onclick=function(){startMemoryGame(currentMemoryMode);};
+    // === Новый WORD GAME ===
+    function startWordGame(modeKey){
+      let pool = [], len = 6;
+      if(modeKey==="word6ru"){pool=wordListRu6;len=6;}else if(modeKey==="word7ru"){pool=wordListRu7;len=7;}
+      else if(modeKey==="word8ru"){pool=wordListRu8;len=8;}else if(modeKey==="word6en"){pool=wordListEn6;len=6;}
+      else if(modeKey==="word7en"){pool=wordListEn7;len=7;}else if(modeKey==="word8en"){pool=wordListEn8;len=8;}
+      currIdx=0;wordAnswered=false;wordResult.innerHTML='';nextWordBtn.style.display='none';clearInterval(wordTimer);
+      let candidateList=pool.filter(w=>w!==prevWord);
+      if(candidateList.length===0){candidateList=pool;}
+      currentWord=candidateList[rand(0,candidateList.length-1)].toUpperCase();
+      prevWord=currentWord;
+      wordBox.innerHTML='';wordLetters=currentWord.split('');
+      for(let l=0;l<wordLetters.length;l++){let span=document.createElement('span');span.className='word-letter';span.textContent=wordLetters[l];wordBox.appendChild(span);}
+      timeLeft = len*2; timerBox.textContent=`⏱ Осталось: ${timeLeft} сек`;
+      wordTimer=setInterval(()=>{timeLeft--;timerBox.textContent=`⏱ Осталось: ${timeLeft} сек`;if(timeLeft<=0)loseWord();},1000);
     }
-    function newBoard(mMode) {
-      let conf=getBoardConf(mMode);
-      board = []; opened = []; matchedCount = 0; locked = false;
-      let nums = [];
-      for (let n = 1; n <= conf.pairs; n++) { nums.push(n); nums.push(n); }
-      shuffle(nums);
-      for (let i = 0; i < conf.size * conf.size; i++) {
-        board.push({num: nums[i], open: false, matched: false});
-      }
+    function winWord(){
+      if(wordAnswered)return;clearInterval(wordTimer);wordAnswered=true;
+      wordResult.innerHTML=`Успех! <span style='color:#3399FF;'>+${rewards[mode]} руб.</span> 🎉`;
+      stats.balance=+(stats.balance+rewards[mode]).toFixed(2);wordStats[mode]+=1;
+      saveStats();saveWordStats();updateScore();updateStatsTable();nextWordBtn.style.display='';
     }
-    function renderBoard(mMode) {
-      let conf=getBoardConf(mMode);
-      boardDiv.innerHTML = '';
-      boardDiv.style.gridTemplateColumns = `repeat(${conf.size}, 48px)`;
-      boardDiv.style.gridTemplateRows = `repeat(${conf.size}, 48px)`;
-      board.forEach((cell, idx) => {
-        let div = document.createElement('div');
-        div.className = 'cell';
-        div.style.width="46px"; div.style.height="46px";
-        if (cell.open) div.classList.add('open');
-        if (cell.matched) div.classList.add('matched');
-        div.textContent = cell.open || cell.matched ? cell.num : '';
-        div.onclick = () => cellClicked(idx, mMode);
-        boardDiv.appendChild(div);
-      });
+    function loseWord(){
+      if(wordAnswered)return;clearInterval(wordTimer);wordAnswered=true;wordResult.innerHTML="Время вышло! Попробуй следующее слово.";nextWordBtn.style.display='';
     }
-    function cellClicked(idx, mMode) {
-      if (locked || board[idx].matched || board[idx].open || opened.length >= 2) return;
-      board[idx].open = true;
-      opened.push(idx);
-      renderBoard(mMode);
-      if (opened.length === 2) {
-        locked = true;
-        let a = board[opened[0]].num, b = board[opened[1]].num;
-        if (a === b) {
-          setTimeout(() => {
-            board[opened[0]].matched = true;
-            board[opened[1]].matched = true;
-            matchedCount++;
-            stats.balance = +(stats.balance + rewards[mMode]).toFixed(2);
-            memoryStats[mMode] += 1;
-            saveStats(); saveMemoryStats();
-            updateScore(); updateStatsTable();
-            opened = [];
-            locked = false;
-            renderBoard(mMode);
-            let conf=getBoardConf(mMode);
-            if (matchedCount === conf.pairs) {
-              memoryInfoDiv.textContent = "Поздравляем! Все пары найдены 🎉";
-              restartBtn.style.display = '';
-            }
-          }, 500);
-        } else {
-          setTimeout(() => {
-            board[opened[0]].open = false;
-            board[opened[1]].open = false;
-            opened = [];
-            locked = false;
-            renderBoard(mMode);
-          }, 800);
-        }
-      }
-    }
-    function startMemoryGame(mMode) {
-      currentMemoryMode = mMode;
-      newBoard(mMode);
-      renderBoard(mMode);
-      memoryInfoDiv.textContent = "Откройте два квадрата с одинаковым числом!";
-      restartBtn.style.display = 'none';
-    }
-    restartBtn.onclick = function() { startMemoryGame(currentMemoryMode); };
-    stats = getSavedStats();
-    memoryStats = getSavedMemoryStats();
+    nextWordBtn.onclick=function(){startWordGame(mode);};
+    // === Инициализация ===
+    loadAllStats();
     updateScore();
     updateStatsTable();
     switchToLettersRu();
-    modeSel.addEventListener('change', () => {
-      mode = modeSel.value;
-      if(mode==="lettersRu")      { switchToLettersRu(); }
-      else if(mode==="lettersEn"){ switchToLettersEn(); }
-      else if(mode==="math10"||mode==="math20"||mode==="math30") { switchToMath(); }
-      else                       { switchToMemory(mode); }
-    });
-    memoryWrap.style.display = 'none';
+    modeSel.onchange=function(){
+      mode=modeSel.value;
+      if(mode==="lettersRu"){switchToLettersRu();}
+      else if(mode==="lettersEn"){switchToLettersEn();}
+      else if(["math10","math20","math30"].includes(mode)){switchToMath();}
+      else if(mode.startsWith("word")){switchToWord(mode);}
+      else{switchToMemory(mode);}
+    };
+    wordWrap.style.display='none';
+    memoryWrap.style.display='none';
+    mathH1.style.display='none';
+    answerWrap.style.display='none';
   </script>
 </body>
 </html>
