@@ -32,8 +32,6 @@
       margin-bottom: 18px;
       padding: 20px 0;
       display: grid;
-      grid-template-columns: repeat(10, 48px);
-      grid-template-rows: repeat(10, 48px);
       gap: 6px;
       width: max-content;
       justify-content: center;
@@ -42,8 +40,6 @@
       box-shadow: 0 3px 14px #cabeb6;
     }
     .cell {
-      width: 46px;
-      height: 46px;
       background: #ff93c2;
       border-radius: 9px;
       box-shadow: 1px 1px 5px #d0a6b4;
@@ -92,8 +88,8 @@
     }
     #restart-btn:hover { background: #33fff0; color: #333; }
     @media (max-width:650px) {
-      #game-board {grid-template-columns: repeat(5, 9vw);grid-template-rows: repeat(20, 9vw);}
-      .cell{width:8vw; height:8vw; font-size:4vw;}
+      #game-board {grid-template-columns: repeat(4, 12vw);}
+      .cell{width:10vw; height:10vw; font-size:4vw;}
     }
   </style>
 </head>
@@ -106,7 +102,9 @@
         <option value="math10">Математика (0–10)</option>
         <option value="math20">Математика (11–20)</option>
         <option value="math30">Математика (21–30)</option>
-        <option value="memory">Найди пару</option>
+        <option value="memory4">Найди пару 4×4</option>
+        <option value="memory6">Найди пару 6×6</option>
+        <option value="memory8">Найди пару 8×8</option>
       </select>
     </div>
     <div id="score">Счет: 0.00 руб.</div>
@@ -131,7 +129,14 @@
     </div>
   </div>
   <script>
-    // Остальные режимы (буквы, математика) — как раньше
+    // Статистика для memory режимов
+    let memoryStats = {
+      memory4: 0,
+      memory6: 0,
+      memory8: 0
+    };
+
+    // ОБЫЧНЫЕ РЕЖИМЫ
     const letters = [
       'А','Б','В','Г','Д','Е','Ё','Ж','З','И','Й','К','Л','М','Н','О','П','Р',
       'С','Т','У','Ф','Х','Ц','Ч','Ш','Щ','Ъ','Ы','Ь','Э','Ю','Я'
@@ -144,7 +149,10 @@
       letters: 0.25,
       math10: 0.5,
       math20: 0.75,
-      math30: 1.0
+      math30: 1.0,
+      memory4: 0.5,
+      memory6: 0.75,
+      memory8: 1.0
     };
     let stats = {
       balance: 0,
@@ -166,6 +174,7 @@
     const statisticsDiv = document.getElementById('statistics');
     const memoryWrap = document.getElementById('memory-wrap');
 
+    // ======= localStorage =======
     function getSavedStats() {
       const s = localStorage.getItem('mathletters_stats');
       if (s) {
@@ -176,11 +185,24 @@
       }
       return stats;
     }
+    function getSavedMemoryStats() {
+      const s = localStorage.getItem('mathletters_memstats');
+      if (s) {
+        try {
+          let obj = JSON.parse(s);
+          if (obj.memory4 >= 0 && obj.memory6 >= 0 && obj.memory8 >= 0) return obj;
+        } catch{}
+      }
+      return memoryStats;
+    }
     function saveStats() { localStorage.setItem('mathletters_stats', JSON.stringify(stats)); }
+    function saveMemoryStats() { localStorage.setItem('mathletters_memstats', JSON.stringify(memoryStats)); }
+
+    // ======= Основные функции =======
     const rand = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
     const getRandomLetter = () => letters[Math.floor(Math.random() * letters.length)];
     const getRandomColor = () => colors[Math.floor(Math.random() * colors.length)];
-    function updateScore() { scoreDiv.innerText = `Счет: ${stats.balance.toFixed(2)} руб.`;}
+    function updateScore() { scoreDiv.innerText = `Счет: ${stats.balance.toFixed(2)} руб.`; }
     function updateStatsTable() {
       statisticsDiv.innerHTML = `<h3>Статистика</h3>
         <table>
@@ -189,6 +211,10 @@
           <tr><td>Правильных ответов (0–10):</td><td><b>${stats.math.math10}</b></td></tr>
           <tr><td>Правильных ответов (11–20):</td><td><b>${stats.math.math20}</b></td></tr>
           <tr><td>Правильных ответов (21–30):</td><td><b>${stats.math.math30}</b></td></tr>
+          <tr><th colspan="2" style="padding:8px 0 4px 0; color:#b567bb;">Найди пару</th></tr>
+          <tr><td>Пары (4×4):</td><td><b>${memoryStats.memory4}</b></td></tr>
+          <tr><td>Пары (6×6):</td><td><b>${memoryStats.memory6}</b></td></tr>
+          <tr><td>Пары (8×8):</td><td><b>${memoryStats.memory8}</b></td></tr>
         </table>
         <div style="margin-top:10px;color:#CB6632;">Всего заработано: <b>${stats.balance.toFixed(2)}</b> руб.</div>`;
     }
@@ -245,7 +271,8 @@
       promptP.innerText = 'Реши пример и введи ответ:';
       generateMathTask();
     }
-    function switchToMemory() {
+
+    function switchToMemory(fieldMode) {
       letterH1.style.display = 'none';
       mathH1.style.display = 'none';
       answerWrap.style.display = 'none';
@@ -255,7 +282,7 @@
       outputBtn.style.display = 'none';
       statisticsDiv.style.display = 'none';
       memoryWrap.style.display = 'block';
-      startMemoryGame();
+      startMemoryGame(fieldMode);
     }
     function checkMathAnswer() {
       const raw = answerInput.value.trim();
@@ -333,27 +360,17 @@
         alert('Пока нечего выводить!\nЗаработай еще 😉');
       }
     });
-    // Запуск и сохранение обычных режимов
-    stats = getSavedStats();
-    updateScore();
-    updateStatsTable();
-    if (mode === 'letters') switchToLetters();
-    else switchToMath();
 
-    modeSel.addEventListener('change', () => {
-      mode = modeSel.value;
-      if(mode==="letters")    { switchToLetters(); }
-      else if(mode==="memory"){ switchToMemory(); }
-      else                   { switchToMath(); }
-    });
-
-    // ====== НАЙДИ ПАРУ ======
-    const boardSize = 10;
-    const numPairs = 50;
-    let board = [], opened = [], matchedCount = 0, locked = false;
+    // ====== НАЙДИ ПАРУ РЕЖИМЫ ======
+    let board = [], opened = [], matchedCount = 0, locked = false, currentMemoryMode = "memory4";
     const boardDiv = document.getElementById('game-board');
     const memoryInfoDiv = document.getElementById('memory-info');
     const restartBtn = document.getElementById('restart-btn');
+    function getBoardConf(mMode) {
+      if (mMode==="memory4") return {size:4, pairs:8};
+      if (mMode==="memory6") return {size:6, pairs:18};
+      return {size:8, pairs:32};
+    }
     function shuffle(array) {
       for (let i = array.length - 1; i > 0; i--) {
         let j = Math.floor(Math.random() * (i + 1));
@@ -361,32 +378,37 @@
       }
       return array;
     }
-    function newBoard() {
+    function newBoard(mMode) {
+      let conf=getBoardConf(mMode);
       board = []; opened = []; matchedCount = 0; locked = false;
       let nums = [];
-      for (let n = 1; n <= numPairs; n++) { nums.push(n); nums.push(n); }
+      for (let n = 1; n <= conf.pairs; n++) { nums.push(n); nums.push(n); }
       shuffle(nums);
-      for (let i = 0; i < boardSize * boardSize; i++) {
+      for (let i = 0; i < conf.size * conf.size; i++) {
         board.push({num: nums[i], open: false, matched: false});
       }
     }
-    function renderBoard() {
+    function renderBoard(mMode) {
+      let conf=getBoardConf(mMode);
       boardDiv.innerHTML = '';
+      boardDiv.style.gridTemplateColumns = `repeat(${conf.size}, 48px)`;
+      boardDiv.style.gridTemplateRows = `repeat(${conf.size}, 48px)`;
       board.forEach((cell, idx) => {
         let div = document.createElement('div');
         div.className = 'cell';
+        div.style.width="46px"; div.style.height="46px";
         if (cell.open) div.classList.add('open');
         if (cell.matched) div.classList.add('matched');
         div.textContent = cell.open || cell.matched ? cell.num : '';
-        div.onclick = () => cellClicked(idx);
+        div.onclick = () => cellClicked(idx, mMode);
         boardDiv.appendChild(div);
       });
     }
-    function cellClicked(idx) {
+    function cellClicked(idx, mMode) {
       if (locked || board[idx].matched || board[idx].open || opened.length >= 2) return;
       board[idx].open = true;
       opened.push(idx);
-      renderBoard();
+      renderBoard(mMode);
       if (opened.length === 2) {
         locked = true;
         let a = board[opened[0]].num, b = board[opened[1]].num;
@@ -395,10 +417,16 @@
             board[opened[0]].matched = true;
             board[opened[1]].matched = true;
             matchedCount++;
+            // добавляем оплату и в статистику
+            stats.balance = +(stats.balance + rewards[mMode]).toFixed(2);
+            memoryStats[mMode] += 1;
+            saveStats(); saveMemoryStats();
+            updateScore(); updateStatsTable();
             opened = [];
             locked = false;
-            renderBoard();
-            if (matchedCount === numPairs) {
+            renderBoard(mMode);
+            let conf=getBoardConf(mMode);
+            if (matchedCount === conf.pairs) {
               memoryInfoDiv.textContent = "Поздравляем! Все пары найдены 🎉";
               restartBtn.style.display = '';
             }
@@ -409,19 +437,35 @@
             board[opened[1]].open = false;
             opened = [];
             locked = false;
-            renderBoard();
+            renderBoard(mMode);
           }, 800);
         }
       }
     }
-    function startMemoryGame() {
-      newBoard();
-      renderBoard();
+    function startMemoryGame(mMode) {
+      currentMemoryMode = mMode;
+      newBoard(mMode);
+      renderBoard(mMode);
       memoryInfoDiv.textContent = "Откройте два квадрата с одинаковым числом!";
       restartBtn.style.display = 'none';
     }
-    restartBtn.onclick = startMemoryGame;
-    // по умолчанию memory не показывается
+    restartBtn.onclick = function() { startMemoryGame(currentMemoryMode); };
+
+    // === ИНИЦИАЛИЗАЦИЯ ===
+    stats = getSavedStats();
+    memoryStats = getSavedMemoryStats();
+    updateScore();
+    updateStatsTable();
+    switchToLetters();
+
+    modeSel.addEventListener('change', () => {
+      mode = modeSel.value;
+      if(mode==="letters")    { switchToLetters(); }
+      else if(mode==="math10"||mode==="math20"||mode==="math30") { switchToMath(); }
+      else                   { switchToMemory(mode); }
+    });
+
+    // по умолчанию memory не показывать
     memoryWrap.style.display = 'none';
   </script>
 </body>
