@@ -98,7 +98,8 @@
     <div id="topbar">
       <span id="modeLabel">Режим:</span>
       <select id="mode">
-        <option value="letters">Буквы</option>
+        <option value="lettersRu">Русские буквы</option>
+        <option value="lettersEn">Английские буквы</option>
         <option value="math10">Математика (0–10)</option>
         <option value="math20">Математика (11–20)</option>
         <option value="math30">Математика (21–30)</option>
@@ -137,16 +138,21 @@
     };
 
     // ОБЫЧНЫЕ РЕЖИМЫ
-    const letters = [
+    const lettersRu = [
       'А','Б','В','Г','Д','Е','Ё','Ж','З','И','Й','К','Л','М','Н','О','П','Р',
       'С','Т','У','Ф','Х','Ц','Ч','Ш','Щ','Ъ','Ы','Ь','Э','Ю','Я'
+    ];
+    const lettersEn = [
+      'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
+      'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'
     ];
     const colors = ["#FF5733", "#33FF57", "#3399FF", "#FBD400", "#FF33A1", "#B833FF", "#33FFF6", "#FF9966",
       "#81FF33", "#FFB533", "#33FFB5", "#FF3383", "#33CFFF", "#9D33FF", "#FFC300", "#FF5733",
       "#8DFF33", "#FF3380", "#338CFF", "#A133FF"
     ];
     const rewards = {
-      letters: 0.25,
+      lettersRu: 0.25,
+      lettersEn: 0.30,
       math10: 0.5,
       math20: 0.75,
       math30: 1.0,
@@ -156,10 +162,11 @@
     };
     let stats = {
       balance: 0,
-      lettersFound: 0,
+      lettersFoundRu: 0,
+      lettersFoundEn: 0,
       math: { math10: 0, math20: 0, math30: 0 }
     };
-    let mode = 'letters';
+    let mode = 'lettersRu';
     const modeSel = document.getElementById('mode');
     const scoreDiv = document.getElementById('score');
     const letterH1 = document.getElementById('letter');
@@ -180,7 +187,10 @@
       if (s) {
         try {
           const parsed = JSON.parse(s);
-          if (parsed && typeof parsed === "object") return {...stats, ...parsed, math: { ...stats.math, ...parsed.math }};
+          if (parsed && typeof parsed === "object") return {
+            ...stats, ...parsed,
+            math: { ...stats.math, ...parsed.math }
+          };
         } catch {}
       }
       return stats;
@@ -200,13 +210,19 @@
 
     // ======= Основные функции =======
     const rand = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
-    const getRandomLetter = () => letters[Math.floor(Math.random() * letters.length)];
+    function getRandomLetterRu() {
+      return lettersRu[Math.floor(Math.random() * lettersRu.length)];
+    }
+    function getRandomLetterEn() {
+      return lettersEn[Math.floor(Math.random() * lettersEn.length)];
+    }
     const getRandomColor = () => colors[Math.floor(Math.random() * colors.length)];
     function updateScore() { scoreDiv.innerText = `Счет: ${stats.balance.toFixed(2)} руб.`; }
     function updateStatsTable() {
       statisticsDiv.innerHTML = `<h3>Статистика</h3>
         <table>
-          <tr><td>Всего найдено букв:</td><td><b>${stats.lettersFound}</b></td></tr>
+          <tr><td>Русских букв найдено:</td><td><b>${stats.lettersFoundRu}</b></td></tr>
+          <tr><td>Английских букв найдено:</td><td><b>${stats.lettersFoundEn}</b></td></tr>
           <tr><th colspan="2" style="padding:8px 0 4px 0; color:#8B5CD0;">Математика</th></tr>
           <tr><td>Правильных ответов (0–10):</td><td><b>${stats.math.math10}</b></td></tr>
           <tr><td>Правильных ответов (11–20):</td><td><b>${stats.math.math20}</b></td></tr>
@@ -242,7 +258,7 @@
     }
     let currentLetter = null, a = 0, b = 0, op = '+', answer = 0;
 
-    function switchToLetters() {
+    function switchToLettersRu() {
       letterH1.style.display = '';
       mathH1.style.display = 'none';
       answerWrap.style.display = 'none';
@@ -252,9 +268,25 @@
       outputBtn.style.display = '';
       statisticsDiv.style.display = '';
       memoryWrap.style.display = 'none';
-      letterH1.innerText = getRandomLetter();
+      letterH1.innerText = getRandomLetterRu();
       letterH1.style.color = getRandomColor();
       promptP.innerText = 'Нажми эту букву на клавиатуре!';
+      resultDiv.innerHTML = '';
+      answerInput.blur();
+    }
+    function switchToLettersEn() {
+      letterH1.style.display = '';
+      mathH1.style.display = 'none';
+      answerWrap.style.display = 'none';
+      promptP.style.display = '';
+      resultDiv.style.display = '';
+      nextBtn.style.display = '';
+      outputBtn.style.display = '';
+      statisticsDiv.style.display = '';
+      memoryWrap.style.display = 'none';
+      letterH1.innerText = getRandomLetterEn();
+      letterH1.style.color = getRandomColor();
+      promptP.innerText = 'Press this letter on the keyboard!';
       resultDiv.innerHTML = '';
       answerInput.blur();
     }
@@ -271,7 +303,6 @@
       promptP.innerText = 'Реши пример и введи ответ:';
       generateMathTask();
     }
-
     function switchToMemory(fieldMode) {
       letterH1.style.display = 'none';
       mathH1.style.display = 'none';
@@ -321,26 +352,47 @@
       e.preventDefault();
     });
     document.addEventListener('keydown', function(e) {
-      if (modeSel.value !== 'letters') return;
-      let pressed = e.key.toUpperCase();
-      let target = letterH1.innerText;
-      if (pressed === target) {
-        stats.balance = +(stats.balance + rewards.letters).toFixed(2);
-        stats.lettersFound += 1;
-        saveStats();
-        updateScore();
-        updateStatsTable();
-        resultDiv.innerHTML = `Молодец! <span style="color:#3399FF;">+${rewards.letters} руб.</span> ✨😍👍`;
-        resultDiv.style.color = "#33FF57";
-        setTimeout(nextItem, 800);
-      } else if (letters.includes(pressed)) {
-        resultDiv.innerHTML = `Ой! Это не "${target}".`;
-        resultDiv.style.color = "#FF5733";
+      if (modeSel.value === 'lettersRu') {
+        let pressed = e.key.toUpperCase();
+        let target = letterH1.innerText;
+        if (pressed === target) {
+          stats.balance = +(stats.balance + rewards.lettersRu).toFixed(2);
+          stats.lettersFoundRu += 1;
+          saveStats();
+          updateScore();
+          updateStatsTable();
+          resultDiv.innerHTML = `Молодец! <span style="color:#3399FF;">+${rewards.lettersRu} руб.</span> ✨😍👍`;
+          resultDiv.style.color = "#33FF57";
+          setTimeout(nextItem, 800);
+        } else if (lettersRu.includes(pressed)) {
+          resultDiv.innerHTML = `Ой! Это не "${target}".`;
+          resultDiv.style.color = "#FF5733";
+        }
+      } else if (modeSel.value === 'lettersEn') {
+        let pressed = e.key.toUpperCase();
+        let target = letterH1.innerText;
+        if (pressed === target) {
+          stats.balance = +(stats.balance + rewards.lettersEn).toFixed(2);
+          stats.lettersFoundEn += 1;
+          saveStats();
+          updateScore();
+          updateStatsTable();
+          resultDiv.innerHTML = `Good job! <span style="color:#3399FF;">+${rewards.lettersEn} руб.</span> ✨😍👍`;
+          resultDiv.style.color = "#33FF57";
+          setTimeout(nextItem, 800);
+        } else if (lettersEn.includes(pressed)) {
+          resultDiv.innerHTML = `Oops! It's not "${target}".`;
+          resultDiv.style.color = "#FF5733";
+        }
       }
     });
     function nextItem() {
-      if (mode === 'letters') {
-        letterH1.innerText = getRandomLetter();
+      if (mode === 'lettersRu') {
+        letterH1.innerText = getRandomLetterRu();
+        letterH1.style.color = getRandomColor();
+        resultDiv.innerHTML = "";
+      } else if (mode === 'lettersEn') {
+        letterH1.innerText = getRandomLetterEn();
         letterH1.style.color = getRandomColor();
         resultDiv.innerHTML = "";
       } else {
@@ -417,7 +469,6 @@
             board[opened[0]].matched = true;
             board[opened[1]].matched = true;
             matchedCount++;
-            // добавляем оплату и в статистику
             stats.balance = +(stats.balance + rewards[mMode]).toFixed(2);
             memoryStats[mMode] += 1;
             saveStats(); saveMemoryStats();
@@ -456,16 +507,16 @@
     memoryStats = getSavedMemoryStats();
     updateScore();
     updateStatsTable();
-    switchToLetters();
+    switchToLettersRu();
 
     modeSel.addEventListener('change', () => {
       mode = modeSel.value;
-      if(mode==="letters")    { switchToLetters(); }
+      if(mode==="lettersRu")      { switchToLettersRu(); }
+      else if(mode==="lettersEn"){ switchToLettersEn(); }
       else if(mode==="math10"||mode==="math20"||mode==="math30") { switchToMath(); }
-      else                   { switchToMemory(mode); }
+      else                       { switchToMemory(mode); }
     });
 
-    // по умолчанию memory не показывать
     memoryWrap.style.display = 'none';
   </script>
 </body>
